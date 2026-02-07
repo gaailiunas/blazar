@@ -1,0 +1,3 @@
+#ifndef BLAZAR_SIDECAR_H
+#define BLAZAR_SIDECAR_H
+#endif // BLAZAR_SIDECAR_H
