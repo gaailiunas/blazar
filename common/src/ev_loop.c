@@ -1,7 +1,12 @@
 #include <blazar/common/ev_loop.h>
+#include <blazar/common/logger.h>
+#include <errno.h>
 #include <stdlib.h>
 #include <sys/epoll.h>
 #include <unistd.h>
+
+#define MAX_EVENTS 64
+#define TIMEOUT 1
 
 static void list_add(ev_io_t **head, ev_io_t *item)
 {
@@ -63,7 +68,44 @@ void ev_loop_destroy(ev_loop_t *loop)
 
 int ev_loop_run(ev_loop_t *loop)
 {
-    // TODO: to impl
+    int nfds;
+    ev_io_t *watcher;
+    int revents = 0;
+    struct epoll_event events[MAX_EVENTS];
+
+    if (!loop) {
+        return -1;
+    }
+
+    loop->running = true;
+
+    while (loop->running) {
+        nfds = epoll_wait(loop->epoll_fd, events, MAX_EVENTS, TIMEOUT);
+        if (nfds < 0) {
+            if (errno == EINTR) {
+                LOG_INFO("Event loop got interrupted");
+                return 0;
+            }
+            return -1;
+        }
+
+        for (int i = 0; i < nfds; i++) {
+            watcher = (ev_io_t *)events[i].data.ptr;
+            if (events[i].events & EPOLLIN) {
+                revents |= EV_READ;
+            }
+            if (events[i].events & EPOLLOUT) {
+                revents |= EV_WRITE;
+            }
+            if (events[i].events & (EPOLLERR | EPOLLHUP)) {
+                revents |= EV_ERROR;
+            }
+            if (watcher && watcher->callback) {
+                watcher->callback(loop, watcher, revents);
+            }
+        }
+    }
+
     return 0;
 }
 
